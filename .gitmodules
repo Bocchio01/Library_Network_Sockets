@@ -1,3 +1,12 @@
 [submodule "libs/Catch"]
 	path = libs/Catch
 	url = https://github.com/catchorg/Catch2.git
+[submodule "libs/cJSON"]
+	path = libs/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "libs/getopt-for-windows"]
+	path = libs/getopt-for-windows
+	url = https://github.com/Chunde/getopt-for-windows.git
+[submodule "libs/log.c"]
+	path = libs/log.c
+	url = https://github.com/rxi/log.c.git
