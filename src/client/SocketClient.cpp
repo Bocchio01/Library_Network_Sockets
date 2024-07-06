@@ -1,8 +1,10 @@
-#include "../SocketCommon.hpp"
+#include "../core/SocketCommon.hpp"
+#include "../core/SocketCore.hpp"
+#include "../core/SocketError.hpp"
 
 #include "SocketClient.hpp"
 
-SocketClient::SocketClient() {}
+// SocketClient::SocketClient() {}
 
 bool SocketClient::Connect(const char *address, int port)
 {

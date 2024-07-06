@@ -7,12 +7,12 @@
 
 extern "C"
 {
-#include "libs/cLOG/cLOG.h"
+#include "libs/log.c/src/log.h"
 }
 
 #include "SocketCommon.hpp"
 #include "SocketCore.hpp"
-#include "client/SocketClient.hpp"
+#include "SocketClient.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
         printf("Server says: %s\n", buffer);
     }
 
-    client.Disconnect();
+    client.Disconnect(client.sock);
 
     return EXIT_SUCCESS;
 }

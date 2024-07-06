@@ -5,12 +5,18 @@
 
 #include "SocketCommon.hpp"
 #include "SocketCore.hpp"
-#include "server/SocketServer.hpp"
+#include "SocketServer.hpp"
 
 extern "C"
 {
-#include "libs/cLOG/cLOG.h"
+#include "libs/log.c/src/log.h"
 }
+
+// void SocketServer::ActionCustom(cJSON *json) override
+// {
+//     log_error("Custom action implemented overridden!");
+//     this->ActionBroadcast(json);
+// }
 
 int main(int argc, char *argv[])
 {
@@ -24,12 +30,10 @@ int main(int argc, char *argv[])
 
     while (server.ShouldRun)
     {
-        std::thread handleNewClient([&server]()
-                                    { server.HandleNewClient(); });
-        handleNewClient.join();
+        server.HandleNewClient();
     }
 
-    server.Disconnect();
+    server.Disconnect(server.sock);
 
     return EXIT_SUCCESS;
 }

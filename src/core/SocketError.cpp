@@ -3,7 +3,7 @@
 
 extern "C"
 {
-#include "libs/cLOG/cLOG.h"
+#include "libs/log.c/src/log.h"
 }
 
 #include <string.h>
@@ -17,7 +17,7 @@ extern "C"
 #include <stdlib.h>
 #include <stdio.h>
 
-const char *get_error_text()
+char *get_error_text()
 {
 
 #if defined(_WIN32)

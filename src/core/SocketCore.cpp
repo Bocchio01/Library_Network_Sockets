@@ -4,9 +4,10 @@
 
 extern "C"
 {
-#include "libs/cLOG/cLOG.h"
+#include "libs/log.c/src/log.h"
 }
 
+#include "SocketCommon.hpp"
 #include "SocketError.hpp"
 #include "SocketCore.hpp"
 
@@ -59,7 +60,7 @@ bool SocketCore::Send(SOCKET target_sock, const char *message)
     return true;
 }
 
-bool SocketCore::SendTo(const char *message, const char *ip, int port)
+bool SocketCore::SendTo(SOCKET target_sock, const char *message, const char *ip, int port)
 {
     SOCKADDR_IN target;
 
@@ -67,7 +68,7 @@ bool SocketCore::SendTo(const char *message, const char *ip, int port)
     target.sin_port = htons(port);
     target.sin_addr.s_addr = inet_addr(ip);
 
-    int result = sendto(this->sock, message, strlen(message), 0, (struct sockaddr *)&target, sizeof(target));
+    int result = sendto(target_sock, message, strlen(message), 0, (struct sockaddr *)&target, sizeof(target));
 
     if (result == SOCKET_ERROR)
     {
@@ -79,7 +80,7 @@ bool SocketCore::SendTo(const char *message, const char *ip, int port)
     return true;
 }
 
-bool SocketCore::Receive(SOCKET target_sock, char *message, int length)
+int SocketCore::Receive(SOCKET target_sock, char *message, int length)
 {
     int result = recv(target_sock, message, length, 0);
 
@@ -93,12 +94,12 @@ bool SocketCore::Receive(SOCKET target_sock, char *message, int length)
     return true;
 }
 
-bool SocketCore::ReceiveFrom(char *message, int length, char *ip, int *port)
+int SocketCore::ReceiveFrom(SOCKET target_sock, char *message, int length, char *ip, int *port)
 {
     SOCKADDR_IN target;
     int target_length = sizeof(target);
 
-    int result = recvfrom(this->sock, message, length, 0, (struct sockaddr *)&target, &target_length);
+    int result = recvfrom(target_sock, message, length, 0, (struct sockaddr *)&target, &target_length);
 
     if (result == SOCKET_ERROR)
     {
@@ -113,12 +114,14 @@ bool SocketCore::ReceiveFrom(char *message, int length, char *ip, int *port)
     return true;
 }
 
-void SocketCore::Disconnect()
+void SocketCore::Disconnect(SOCKET target_sock)
 {
 #ifdef _WIN32
-    closesocket(this->sock);
+    closesocket(target_sock);
     WSACleanup();
 #else
-    close(this->sock);
+    close(target_sock);
 #endif
+
+    // shutdown(target_sock, SD_SEND);
 }

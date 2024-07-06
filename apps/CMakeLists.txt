@@ -1,11 +1,11 @@
-add_executable(Client client.cpp)
-target_link_libraries(Client PUBLIC
+add_executable(Client_exe client.cpp)
+target_link_libraries(Client_exe PRIVATE
     libs
-    src
+    client
 )
 
-add_executable(Server server.cpp)
-target_link_libraries(Server PUBLIC
+add_executable(Server_exe server.cpp)
+target_link_libraries(Server_exe PRIVATE
     libs
-    src
+    server
 )

@@ -37,5 +37,7 @@
 extern "C"
 {
 #include "libs/cJSON/cJSON.h"
-#include "libs/cLOG/cLOG.h"
+#include "libs/log.c/src/log.h"
 }
+
+#define MAX_LENGTH_MESSAGE 1024

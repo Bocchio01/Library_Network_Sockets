@@ -1,8 +1,17 @@
-#include "../SocketCommon.hpp"
+#include "../core/SocketCommon.hpp"
 
 #include <string>
+#include <iostream>
+#include <thread>
+#include <atomic>
 
 #include "SocketServer.hpp"
+
+#include "actions/Broadcast.hpp"
+#include "actions/Custom.hpp"
+#include "actions/help.hpp"
+
+#include "libs/cJSON/cJSON.h"
 
 // SocketServer::SocketServer() {}
 
@@ -25,7 +34,7 @@ bool SocketServer::Bind(const char *address, int port)
 
     if (result == SOCKET_ERROR)
     {
-        this->Disconnect();
+        this->Disconnect(this->sock);
         // Exception
         log_fatal("bind() failed with error: %s", get_error_text());
         return false;
@@ -40,7 +49,7 @@ bool SocketServer::Listen(int backlog)
 
     if (result == SOCKET_ERROR)
     {
-        this->Disconnect();
+        this->Disconnect(this->sock);
         // Exception
         log_fatal("listen() failed with error: %s", get_error_text());
         return false;
@@ -53,48 +62,100 @@ bool SocketServer::Listen(int backlog)
     return true;
 }
 
-SOCKET SocketServer::Accept()
+SOCKET_extended_t SocketServer::Accept()
 {
-    SOCKADDR_IN client;
-    int clientSize = sizeof(client);
+    SOCKADDR_IN clientAddress;
+    int clientAddressSize = sizeof(clientAddress);
 
-    SOCKET clientSocket = accept(this->sock, (SOCKADDR *)&client, &clientSize);
+    SOCKET clientSocket = accept(this->sock, (SOCKADDR *)&clientAddress, &clientAddressSize);
 
     if (clientSocket == INVALID_SOCKET)
     {
         // Exception
         log_fatal("accept() failed with error: %s", get_error_text());
-        return INVALID_SOCKET;
+        return {INVALID_SOCKET, clientAddress};
     }
 
-    return clientSocket;
+    SOCKET_extended_t clientExtended;
+    clientExtended.sock = clientSocket;
+    clientExtended.address = clientAddress;
+
+    return clientExtended;
 }
 
 void SocketServer::HandleNewClient()
 {
     char buffer[4 * 1024];
-    SOCKET clientSocket = this->Accept();
+    SOCKET_extended_t clientExtended = this->Accept();
 
-    if (clientSocket != INVALID_SOCKET)
+    if (clientExtended.sock != INVALID_SOCKET)
     {
         log_info("New client connected");
 
-        this->clients.push_back(clientSocket);
+        this->clients.push_back(clientExtended);
 
-        this->Receive(clientSocket, buffer, sizeof(buffer));
+        std::thread handleConnectedClient([this, clientExtended]()
+                                          { this->HandleConnectedClient(clientExtended); });
+        handleConnectedClient.join();
+    }
+}
 
-        if (strstr(buffer, "exit") != NULL)
+void SocketServer::HandleConnectedClient(SOCKET_extended_t clientExtended)
+{
+    log_info("Handling connected client");
+
+    char buffer[MAX_LENGTH_MESSAGE] = {0};
+
+    while (true)
+    {
+        int nBytesReceived = this->Receive(clientExtended.sock, buffer, sizeof(buffer));
+
+        if (nBytesReceived == 0)
         {
-            this->ShouldRun = false;
+            log_info("Client disconnected");
+            this->Disconnect(clientExtended.sock);
+            // this->clients.erase(
+            //     std::remove(this->clients.begin(), this->clients.end(), clientExtended),
+            //     this->clients.end());
             return;
         }
 
+        buffer[nBytesReceived] = '\0';
         log_info("Received: %s", buffer);
+        this->Send(clientExtended.sock, "Hello from server");
 
-        this->Send(clientSocket, "Hello from server");
-        for (int i = 0; i < this->clients.size(); i++)
+        cJSON *json = cJSON_Parse(buffer);
+        if (json == NULL)
         {
-            this->Send(this->clients[i], "New client connected");
+            const char *error_ptr = cJSON_GetErrorPtr();
+            if (error_ptr != NULL)
+            {
+                log_error("Error before: %s\n", error_ptr);
+                cJSON_Delete(json);
+                return;
+            }
+        }
+
+        log_debug("Parsed: %s", cJSON_Print(json));
+        const cJSON *action = cJSON_GetObjectItemCaseSensitive(json, "action");
+        if (cJSON_IsString(action) && (action->valuestring != NULL))
+            this->ActionHandler(action->valuestring, json);
+        else
+        {
+            this->Send(clientExtended.sock, "Invalid JSON");
+            log_error("Error parsing JSON");
         }
     }
+}
+
+void SocketServer::ActionHandler(char *action_string, cJSON *json)
+{
+    if (strcmp(action_string, "broadcast") == 0)
+        this->ActionBroadcast(json);
+
+    else if (strcmp(action_string, "help") == 0)
+        this->ActionHelp();
+
+    else if (strcmp(action_string, "custom") == 0)
+        this->ActionCustom(json);
 }

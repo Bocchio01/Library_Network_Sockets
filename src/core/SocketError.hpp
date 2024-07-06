@@ -3,6 +3,6 @@
 
 #include <stdio.h>
 
-const char *get_error_text();
+char *get_error_text();
 
 #endif

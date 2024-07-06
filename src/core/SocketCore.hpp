@@ -42,10 +42,10 @@ public:
     bool Create(int address_family = AF_INET, int type = SOCK_STREAM, int protocol = IPPROTO_TCP);
 
     bool Send(SOCKET target_sock, const char *message);
-    bool SendTo(const char *message, const char *ip, int port);
-    bool Receive(SOCKET target_sock, char *message, int length);
-    bool ReceiveFrom(char *message, int length, char *ip, int *port);
-    void Disconnect();
+    bool SendTo(SOCKET target_sock, const char *message, const char *ip, int port);
+    int Receive(SOCKET target_sock, char *message, int length);
+    int ReceiveFrom(SOCKET target_sock, char *message, int length, char *ip, int *port);
+    void Disconnect(SOCKET target_sock);
 
     // iResult = shutdown(ClientSocket, SD_SEND);
 };
