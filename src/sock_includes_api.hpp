@@ -1,8 +1,12 @@
+#ifndef SOCK_INCLUDES_API_HPP
+#define SOCK_INCLUDES_API_HPP
+
 #ifdef _WIN32
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+
 #ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #endif
@@ -30,14 +34,4 @@
 
 #endif
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-
-extern "C"
-{
-#include "libs/cJSON/cJSON.h"
-#include "libs/log.c/src/log.h"
-}
-
-#define MAX_LENGTH_MESSAGE 1024
+#endif

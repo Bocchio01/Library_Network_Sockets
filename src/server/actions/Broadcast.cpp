@@ -1,11 +1,8 @@
-#include "../SocketServer.hpp"
-#include "../../core/SocketCommon.hpp"
-#include "../../core/SocketCore.hpp"
-#include "../../core/SocketError.hpp"
+#include "../sock_server.hpp"
+
 #include "Broadcast.hpp"
 
 #include "libs/cJSON/cJSON.h"
-// #include <cJSON.h>
 
 void SocketServer::ActionBroadcast(cJSON *json)
 {

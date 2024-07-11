@@ -7,7 +7,7 @@ project(Library_Network_Socket
 )
 
 # Set the C/C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -19,7 +19,15 @@ include_directories(
 )
 
 # Versioning control
-# configure_file(Config.h.in src/Config.h)
+configure_file(src/Config.h.in src/Config.h)
+
 add_subdirectory(libs)
 add_subdirectory(src)
 add_subdirectory(apps)
+
+include(CTest)
+
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

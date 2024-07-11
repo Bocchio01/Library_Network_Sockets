@@ -1,21 +1,15 @@
-#ifndef CSOCKETSERVER_HPP
-#define CSOCKETSERVER_HPP
+#ifndef SOCK_SERVER_HPP
+#define SOCK_SERVER_HPP
 
 #define MAX_CLIENTS 10
 
-#include "../core/SocketCommon.hpp"
-
-#include "../core/SocketCore.hpp"
-#include "../core/SocketError.hpp"
-
-#include "actions/Broadcast.hpp"
-#include "actions/Custom.hpp"
+#include "../sock_includes_api.hpp"
+#include "../core/sock_core.hpp"
+#include "../core/sock_exceptions.hpp"
 
 #include "libs/cJSON/cJSON.h"
 
 #include <vector>
-
-#pragma comment(lib, "Ws2_32.lib")
 
 typedef struct
 {
@@ -31,7 +25,7 @@ enum Actions_t
     CUSTOM
 };
 
-class SocketServer : public SocketCore
+class SocketServer : public SockCore
 {
 private:
     std::vector<SOCKET_extended_t> clients;
@@ -39,7 +33,7 @@ private:
 public:
     // SocketServer();
 
-    bool Bind(const char *address, int port);
+    bool Bind(const char *ip, int port);
     bool Listen(int backlog = MAX_CLIENTS);
     SOCKET_extended_t Accept();
 

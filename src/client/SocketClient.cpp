@@ -1,6 +1,6 @@
-#include "../core/SocketCommon.hpp"
-#include "../core/SocketCore.hpp"
-#include "../core/SocketError.hpp"
+#include "
+#include "core/SocketCore.hpp"
+#include "core/SocketError.hpp"
 
 #include "SocketClient.hpp"
 

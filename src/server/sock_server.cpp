@@ -1,42 +1,33 @@
-#include "../core/SocketCommon.hpp"
-
 #include <string>
 #include <iostream>
 #include <thread>
 #include <atomic>
 
-#include "SocketServer.hpp"
+extern "C"
+{
+#include "libs/log.c/src/log.h"
+}
+#include "libs/cJSON/cJSON.h"
 
+#include "../sock_includes_api.hpp"
+#include "sock_server.hpp"
 #include "actions/Broadcast.hpp"
 #include "actions/Custom.hpp"
 #include "actions/help.hpp"
 
-#include "libs/cJSON/cJSON.h"
-
-// SocketServer::SocketServer() {}
-
-bool SocketServer::Bind(const char *address, int port)
+bool SocketServer::Bind(const char *ip, int port)
 {
-    ADDRINFOA hints;
-    PADDRINFOA hostInfo;
-
+    this->ip = ip;
     this->port = port;
-    this->sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    SOCKADDR_IN address = this->createAddress(AF_INET, this->ip, this->port);
 
-    ZeroMemory(&hints, sizeof(ADDRINFOA));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
-
-    getaddrinfo(NULL, std::to_string(this->port).c_str(), &hints, &hostInfo);
-    int result = bind(this->sock, hostInfo->ai_addr, (int)hostInfo->ai_addrlen);
+    int result = bind(this->sock, (struct sockaddr *)&address, sizeof(address));
 
     if (result == SOCKET_ERROR)
     {
         this->Disconnect(this->sock);
         // Exception
-        log_fatal("bind() failed with error: %s", get_error_text());
+        log_fatal("bind() failed with error: %s", SockCore::getLastError());
         return false;
     }
 
@@ -51,7 +42,7 @@ bool SocketServer::Listen(int backlog)
     {
         this->Disconnect(this->sock);
         // Exception
-        log_fatal("listen() failed with error: %s", get_error_text());
+        log_fatal("listen() failed with error: %s", SockCore::getLastError());
         return false;
     }
     else
@@ -72,7 +63,7 @@ SOCKET_extended_t SocketServer::Accept()
     if (clientSocket == INVALID_SOCKET)
     {
         // Exception
-        log_fatal("accept() failed with error: %s", get_error_text());
+        log_fatal("accept() failed with error: %s", SockCore::getLastError());
         return {INVALID_SOCKET, clientAddress};
     }
 
@@ -104,7 +95,7 @@ void SocketServer::HandleConnectedClient(SOCKET_extended_t clientExtended)
 {
     log_info("Handling connected client");
 
-    char buffer[MAX_LENGTH_MESSAGE] = {0};
+    char buffer[1024] = {0};
 
     while (true)
     {

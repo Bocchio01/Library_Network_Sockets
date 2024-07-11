@@ -8,7 +8,7 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-class SocketClient : public SocketCore
+class SocketClient : public SockCore
 {
 
 public:

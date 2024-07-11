@@ -3,9 +3,9 @@
 #include <atomic>
 #include <string>
 
-#include "SocketCommon.hpp"
-#include "SocketCore.hpp"
-#include "SocketServer.hpp"
+#include "src/sock_includes_api.hpp"
+#include "src/core/sock_core.hpp"
+#include "src/server/sock_server.hpp"
 
 extern "C"
 {
@@ -22,18 +22,26 @@ int main(int argc, char *argv[])
 {
     log_set_level(LOG_INFO);
 
-    SocketServer server;
-
-    server.Create();
-    server.Bind("127.0.0.1", 5500);
-    server.Listen();
-
-    while (server.ShouldRun)
+    try
     {
-        server.HandleNewClient();
-    }
 
-    server.Disconnect(server.sock);
+        SocketServer server;
+
+        server.Create();
+        server.Bind("127.0.0.1", 5500);
+        server.Listen();
+
+        while (server.ShouldRun)
+        {
+            server.HandleNewClient();
+        }
+
+        server.Disconnect(server.sock);
+    }
+    catch (const TypedException<SockExceptionCode> &e)
+    {
+        std::cerr << e;
+    }
 
     return EXIT_SUCCESS;
 }

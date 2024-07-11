@@ -1,13 +1,9 @@
 add_library(core
-    SocketCommon.cpp
-    SocketCommon.hpp
-    SocketCore.cpp
-    SocketCore.hpp
-    SocketError.cpp
-    SocketError.hpp
+    sock_core.cpp
+    sock_exceptions.cpp
 )
 
-target_include_directories(core PUBLIC
+target_include_directories(core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
