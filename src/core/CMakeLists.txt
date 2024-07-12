@@ -1,6 +1,5 @@
 add_library(core
     sock_core.cpp
-    sock_exceptions.cpp
 )
 
 target_include_directories(core PRIVATE

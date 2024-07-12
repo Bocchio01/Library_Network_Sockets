@@ -1,12 +1,12 @@
-#include "
-#include "core/SocketCore.hpp"
-#include "core/SocketError.hpp"
+#include "../sock_includes_api.hpp"
+#include "../core/sock_core.hpp"
+#include "sock_client.hpp"
 
-#include "SocketClient.hpp"
+#include "libs/spdlog/include/spdlog/spdlog.h"
 
 // SocketClient::SocketClient() {}
 
-bool SocketClient::Connect(const char *address, int port)
+bool SocketClient::connectTo(const char *address, int port)
 {
     this->port = port;
 
@@ -19,12 +19,12 @@ bool SocketClient::Connect(const char *address, int port)
 
     if (result == SOCKET_ERROR)
     {
-        log_fatal("connect() failed with error: %s", get_error_text());
+        spdlog::critical("connect() failed with error: {}", SockCore::getLastError());
         return false;
     }
     else
     {
-        log_info("Connected to %s:%d", address, port);
+        spdlog::info("Connected to {}:{}", address, port);
     }
 
     return true;

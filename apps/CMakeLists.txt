@@ -1,4 +1,7 @@
 add_executable(Client_exe client.cpp)
+target_link_directories(Client_exe PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 target_link_libraries(Client_exe PRIVATE
     libs
     client

@@ -3,20 +3,46 @@
 #include <thread>
 #include <atomic>
 
-extern "C"
-{
-#include "libs/log.c/src/log.h"
-}
-#include "libs/cJSON/cJSON.h"
+#include "libs/spdlog/include/spdlog/spdlog.h"
+#include "libs/rapidjson/include/rapidjson/reader.h"
+#include "libs/rapidjson/include/rapidjson/document.h"
+#include "libs/rapidjson/include/rapidjson/filewritestream.h"
+#include "libs/rapidjson/include/rapidjson/writer.h"
+#include <cstdio>
 
 #include "../sock_includes_api.hpp"
 #include "sock_server.hpp"
-#include "actions/Broadcast.hpp"
-#include "actions/Custom.hpp"
-#include "actions/help.hpp"
+#include <iostream>
+#include <assert.h>
+#include <mutex>
 
-bool SocketServer::Bind(const char *ip, int port)
+#include "actions/action_broadcast.hpp"
+
+SockServer::SockServer() : should_run(true)
 {
+    spdlog::trace("Initializing SockServer class...");
+
+    addAction("broadcast", actionBroadcast);
+}
+
+SockServer::~SockServer()
+{
+    spdlog::trace("Destroying SockServer class...");
+
+    for (auto &client : this->connected_clients)
+    {
+        this->closeSocket(client.sock);
+    }
+
+    spdlog::trace("SockServer class destroyed.");
+
+    return;
+}
+
+bool SockServer::bindTo(const std::string ip, const int port)
+{
+    spdlog::trace("Binding socket to {}:{}", ip.c_str(), port);
+
     this->ip = ip;
     this->port = port;
     SOCKADDR_IN address = this->createAddress(AF_INET, this->ip, this->port);
@@ -25,128 +51,172 @@ bool SocketServer::Bind(const char *ip, int port)
 
     if (result == SOCKET_ERROR)
     {
-        this->Disconnect(this->sock);
-        // Exception
-        log_fatal("bind() failed with error: %s", SockCore::getLastError());
+        spdlog::critical("bind() failed: {}", SockCore::getLastError());
+        throw TYPED_EXCEPTION("bind() failed", SockExceptionCode::BIND_FAILED);
         return false;
     }
 
     return true;
 }
 
-bool SocketServer::Listen(int backlog)
+bool SockServer::startListening(int backlog)
 {
+    spdlog::trace("Launching listen()...");
+
     int result = listen(this->sock, backlog);
 
     if (result == SOCKET_ERROR)
     {
-        this->Disconnect(this->sock);
-        // Exception
-        log_fatal("listen() failed with error: %s", SockCore::getLastError());
+        spdlog::critical("listen() failed: {}", SockCore::getLastError());
+        throw TYPED_EXCEPTION("listen() failed", SockExceptionCode::LISTEN_FAILED);
         return false;
     }
     else
     {
-        log_info("Listening on port %d", this->port);
+        spdlog::info("Listening at {}:{}", this->ip.c_str(), this->port);
     }
 
     return true;
 }
 
-SOCKET_extended_t SocketServer::Accept()
+SockConnectedClient SockServer::acceptNewClient()
 {
-    SOCKADDR_IN clientAddress;
-    int clientAddressSize = sizeof(clientAddress);
+    SockConnectedClient connected_client(INVALID_SOCKET, SOCKADDR_IN());
+    int connectedClientAddressSize = sizeof(connected_client.address);
 
-    SOCKET clientSocket = accept(this->sock, (SOCKADDR *)&clientAddress, &clientAddressSize);
+    connected_client.sock = accept(this->sock, (SOCKADDR *)&connected_client.address, &connectedClientAddressSize);
 
-    if (clientSocket == INVALID_SOCKET)
+    if (connected_client.sock == INVALID_SOCKET)
     {
-        // Exception
-        log_fatal("accept() failed with error: %s", SockCore::getLastError());
-        return {INVALID_SOCKET, clientAddress};
+        spdlog::error("accept() failed: {}", SockCore::getLastError());
+        return connected_client;
     }
 
-    SOCKET_extended_t clientExtended;
-    clientExtended.sock = clientSocket;
-    clientExtended.address = clientAddress;
-
-    return clientExtended;
+    return connected_client;
 }
 
-void SocketServer::HandleNewClient()
+void SockServer::handleNewClient()
 {
-    char buffer[4 * 1024];
-    SOCKET_extended_t clientExtended = this->Accept();
-
-    if (clientExtended.sock != INVALID_SOCKET)
+    while (this->should_run)
     {
-        log_info("New client connected");
+        SockConnectedClient connected_client = this->acceptNewClient();
 
-        this->clients.push_back(clientExtended);
+        if (connected_client.sock != INVALID_SOCKET)
+        {
+            spdlog::info("New client connected");
 
-        std::thread handleConnectedClient([this, clientExtended]()
-                                          { this->HandleConnectedClient(clientExtended); });
-        handleConnectedClient.join();
+            this->addConnectedClient(connected_client);
+
+            this->connected_client_threads.emplace_back([this, connected_client]()
+                                                        { this->handleConnectedClient(connected_client); });
+        }
     }
 }
 
-void SocketServer::HandleConnectedClient(SOCKET_extended_t clientExtended)
+void SockServer::handleConnectedClient(SockConnectedClient connected_client)
 {
-    log_info("Handling connected client");
+    spdlog::info("Handling connected client");
 
+    rapidjson::Document json;
     char buffer[1024] = {0};
 
-    while (true)
+    while (this->should_run)
     {
-        int nBytesReceived = this->Receive(clientExtended.sock, buffer, sizeof(buffer));
+        int nBytesReceived = this->receiveMessage(connected_client.sock, buffer, sizeof(buffer));
 
         if (nBytesReceived == 0)
         {
-            log_info("Client disconnected");
-            this->Disconnect(clientExtended.sock);
-            // this->clients.erase(
-            //     std::remove(this->clients.begin(), this->clients.end(), clientExtended),
-            //     this->clients.end());
+            this->removeConnectedClient(connected_client);
+            spdlog::warn("Client disconnected.");
             return;
         }
 
-        buffer[nBytesReceived] = '\0';
-        log_info("Received: %s", buffer);
-        this->Send(clientExtended.sock, "Hello from server");
-
-        cJSON *json = cJSON_Parse(buffer);
-        if (json == NULL)
+        // buffer[nBytesReceived] = '\0';
+        json.Parse(buffer);
+        if (json.HasParseError())
         {
-            const char *error_ptr = cJSON_GetErrorPtr();
-            if (error_ptr != NULL)
-            {
-                log_error("Error before: %s\n", error_ptr);
-                cJSON_Delete(json);
-                return;
-            }
+            spdlog::error("Error parsing JSON.");
+            return;
         }
 
-        log_debug("Parsed: %s", cJSON_Print(json));
-        const cJSON *action = cJSON_GetObjectItemCaseSensitive(json, "action");
-        if (cJSON_IsString(action) && (action->valuestring != NULL))
-            this->ActionHandler(action->valuestring, json);
-        else
-        {
-            this->Send(clientExtended.sock, "Invalid JSON");
-            log_error("Error parsing JSON");
-        }
+        assert(json.IsObject());
+        assert(json.HasMember("action"));
+        assert(json["action"].IsString());
+
+        std::string action = json["action"].GetString();
+        runAction(action.c_str(), json);
     }
 }
 
-void SocketServer::ActionHandler(char *action_string, cJSON *json)
+void SockServer::addConnectedClient(SockConnectedClient connected_client)
 {
-    if (strcmp(action_string, "broadcast") == 0)
-        this->ActionBroadcast(json);
+    spdlog::info("Adding client with IP: {}", inet_ntoa(connected_client.address.sin_addr));
 
-    else if (strcmp(action_string, "help") == 0)
-        this->ActionHelp();
+    std::lock_guard<std::mutex> lock(this->connected_clients_mutex);
+    this->connected_clients.push_back(connected_client);
 
-    else if (strcmp(action_string, "custom") == 0)
-        this->ActionCustom(json);
+    spdlog::info("Client added.");
+}
+
+void SockServer::removeConnectedClient(SockConnectedClient connected_client)
+{
+    spdlog::info("Removing client with IP: {}", inet_ntoa(connected_client.address.sin_addr));
+
+    std::lock_guard<std::mutex> lock(this->connected_clients_mutex);
+    this->connected_clients.erase(std::remove(this->connected_clients.begin(), this->connected_clients.end(), connected_client), this->connected_clients.end());
+    this->closeSocket(connected_client.sock);
+
+    spdlog::info("Client removed.");
+}
+
+void SockServer::addAction(const std::string &name, std::function<void(SockServer *, const rapidjson::Document &)> func)
+{
+    this->actions[name] = func;
+}
+
+void SockServer::runAction(const std::string &action, const rapidjson::Document &json)
+{
+    spdlog::info("Executing action: {}", action);
+
+    auto it = actions.find(action);
+    if (it == actions.end())
+    {
+        spdlog::error("Action not found: {}", action);
+        return;
+    }
+
+    it->second(this, json);
+}
+
+void SockServer::start()
+{
+    std::thread([this]()
+                {
+        while (this->should_run) {
+            handleNewClient();
+        } })
+        .detach();
+}
+
+void SockServer::stop()
+{
+    spdlog::info("Stopping server...");
+
+    should_run = false;
+
+    shutdown_condition_variable.notify_all();
+
+    closeSocket(sock);
+
+    for (auto &thread : this->connected_client_threads)
+    {
+        if (thread.joinable())
+        {
+            thread.join();
+        }
+    }
+
+    closeSocket(sock);
+
+    spdlog::info("Server stopped.");
 }
